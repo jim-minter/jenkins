@@ -81,7 +81,7 @@ function install_plugins() {
     # Call install plugins with the temporary file
     /usr/local/bin/install-plugins.sh "${plugins_file}"
   fi
-  
+
   if [ "$(ls /opt/openshift/plugins/* 2>/dev/null)" ]; then
     mkdir -p ${JENKINS_HOME}/plugins
     echo "Copying $(ls /opt/openshift/plugins/* | wc -l) files to ${JENKINS_HOME} ..."
@@ -161,12 +161,8 @@ if [[ "${CONTAINER_MEMORY_IN_BYTES}" -lt $((2**40)) ]]; then
   fi
 fi
 
-if [[ -z "$JAVA_GC_OPTS" ]]; then
-  # See https://developers.redhat.com/blog/2014/07/22/dude-wheres-my-paas-memory-tuning-javas-footprint-in-openshift-part-2/ .
-  # The values are aggressively set with the intention of relaxing GC CPU time
-  # restrictions to enable it to free as much as possible, as well as
-  # encouraging the GC to free unused heap memory back to the OS.
-  JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=10 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90"
+if [[ -z "$JAVA_GC_OPTS" && "${CONTAINER_MEMORY_IN_MB}" -lt 2048 ]]; then
+  JAVA_GC_OPTS="-XX:+UseSerialGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40"
 fi
 
 if [[ "${USE_JAVA_DIAGNOSTICS}" || "${JAVA_DIAGNOSTICS}" ]]; then
@@ -227,14 +223,14 @@ done
 if [ "$(ls /usr/lib/jenkins/*.hpi 2>/dev/null)" ]; then
     # in case very first time through, make sure plugins dir is there
     mkdir -p ${JENKINS_HOME}/plugins
-   
+
    for FILENAME in /usr/lib/jenkins/*.hpi ; do
         basefilename=`basename $FILENAME .hpi`
         plugin_image_volume_location="${JENKINS_HOME}/plugins/${basefilename}.*"
         if [ "$(ls ${plugin_image_volume_location} 2>/dev/null)" ]; then
           continue
         fi
-	echo "Linking ${FILENAME} RPM installed Jenkins plugins to ${JENKINS_HOME} ..."  
+	echo "Linking ${FILENAME} RPM installed Jenkins plugins to ${JENKINS_HOME} ..."
         ln -s  $FILENAME ${JENKINS_HOME}/plugins/${basefilename}.jpi
    done
 fi
@@ -249,15 +245,15 @@ if [ ! -e ${JENKINS_HOME}/configured ]; then
     install_plugins
 
     echo "Creating initial Jenkins 'admin' user ..."
-    
+
     update_admin_password
-    
+
     touch ${JENKINS_HOME}/configured
-else  
+else
   if [ ! -z "${OVERRIDE_PV_CONFIG_WITH_IMAGE_CONFIG}" ]; then
     echo "Overriding jenkins configuration stored in ${JENKINS_HOME}"
 
-    # remove any files/directories in $JENKINS_HOME that are specified in $image_config_dir, 
+    # remove any files/directories in $JENKINS_HOME that are specified in $image_config_dir,
     # otherwise the two will get merged when cp is run below
     for f in ${image_config_dir}/*; do
       fileName=${f#${image_config_dir}'/'}
@@ -272,13 +268,13 @@ else
     echo "Copying Jenkins configuration to ${JENKINS_HOME}..."
     cp -r $image_config_dir/* ${JENKINS_HOME}
   fi
-    
+
   if [ ! -z "${OVERRIDE_PV_PLUGINS_WITH_IMAGE_PLUGINS}" ]; then
     echo "Overriding plugins stored in ${JENKINS_HOME}/plugins"
     rm -rf ${JENKINS_HOME}/plugins
 
     install_plugins
-  fi  
+  fi
 fi
 
 if [ -e ${JENKINS_HOME}/password ]; then

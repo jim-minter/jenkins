@@ -98,12 +98,8 @@ if [[ $# -gt 1 ]]; then
     fi
   fi
 
-  if [[ -z "$JAVA_GC_OPTS" ]]; then
-    # See https://developers.redhat.com/blog/2014/07/22/dude-wheres-my-paas-memory-tuning-javas-footprint-in-openshift-part-2/ .
-    # The values are aggressively set with the intention of relaxing GC CPU time
-    # restrictions to enable it to free as much as possible, as well as
-    # encouraging the GC to free unused heap memory back to the OS.
-    JAVA_GC_OPTS="-XX:+UseParallelGC -XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=10 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90"
+  if [[ -z "$JAVA_GC_OPTS" && "${CONTAINER_MEMORY_IN_MB}" -lt 2048 ]]; then
+    JAVA_GC_OPTS="-XX:+UseSerialGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40"
   fi
 
   if [[ "${USE_JAVA_DIAGNOSTICS}" || "${JAVA_DIAGNOSTICS}" ]]; then
